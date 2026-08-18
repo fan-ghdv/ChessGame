@@ -6,9 +6,19 @@ public class Piece
 
     public PieceColor Color { get; }
 
-    public Piece(PieceType type, PieceColor color)
+    public bool HasMoved { get; private set; }
+
+    public Piece(
+        PieceType type,
+        PieceColor color)
     {
         Type = type;
         Color = color;
+        HasMoved = false;
+    }
+
+    public void MarkAsMoved()
+    {
+        HasMoved = true;
     }
 }
