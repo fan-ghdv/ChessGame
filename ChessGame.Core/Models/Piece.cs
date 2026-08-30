@@ -21,4 +21,9 @@ public class Piece
     {
         HasMoved = true;
     }
+
+    public void RestoreMovedState(bool hasMoved)
+    {
+        HasMoved = hasMoved;
+    }
 }

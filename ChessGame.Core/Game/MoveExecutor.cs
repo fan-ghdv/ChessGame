@@ -24,9 +24,9 @@ public static class MoveExecutor
             return false;
         }
 
-        // =========================
+        // =========================================================
         // CASTLING
-        // =========================
+        // =========================================================
 
         if (piece.Type == PieceType.King)
         {
@@ -35,7 +35,10 @@ public static class MoveExecutor
                     ? 7
                     : 0;
 
+            // -----------------------------------------------------
             // King-side castling
+            // -----------------------------------------------------
+
             if (move.From == new Position(row, 4) &&
                 move.To == new Position(row, 6))
             {
@@ -52,7 +55,10 @@ public static class MoveExecutor
                 );
             }
 
+            // -----------------------------------------------------
             // Queen-side castling
+            // -----------------------------------------------------
+
             if (move.From == new Position(row, 4) &&
                 move.To == new Position(row, 2))
             {
@@ -70,9 +76,9 @@ public static class MoveExecutor
             }
         }
 
-        // =========================
+        // =========================================================
         // EN PASSANT
-        // =========================
+        // =========================================================
 
         if (piece.Type == PieceType.Pawn)
         {
@@ -90,9 +96,9 @@ public static class MoveExecutor
             }
         }
 
-        // =========================
-        // NORMAL MOVE
-        // =========================
+        // =========================================================
+        // NORMAL MOVE VALIDATION
+        // =========================================================
 
         if (!MoveValidator.IsLegalMove(
                 board,
@@ -102,20 +108,30 @@ public static class MoveExecutor
             return false;
         }
 
-        // =========================
-        // CHECK PROMOTION
-        // =========================
+        // Save the captured piece BEFORE modifying the board.
+        Piece? capturedPiece =
+            board.GetPiece(move.To);
 
-        if (piece.Type == PieceType.Pawn &&
+        // =========================================================
+        // PROMOTION CHECK
+        // =========================================================
+
+        bool isPromotion =
+            piece.Type == PieceType.Pawn &&
             PawnPromotion.CanPromote(
                 move.To,
-                color))
+                color
+            );
+
+        if (isPromotion &&
+            promotionType == null)
         {
-            if (promotionType == null)
-            {
-                return false;
-            }
+            return false;
         }
+
+        // =========================================================
+        // MOVE PIECE
+        // =========================================================
 
         board.SetPiece(
             move.To,
@@ -127,25 +143,17 @@ public static class MoveExecutor
             null
         );
 
-        // =========================
+        // =========================================================
         // PROMOTION
-        // =========================
+        // =========================================================
 
-        if (piece.Type == PieceType.Pawn &&
-            PawnPromotion.CanPromote(
-                move.To,
-                color))
+        if (isPromotion)
         {
-            if (promotionType == null)
-            {
-                return false;
-            }
-
             Piece promotedPiece =
                 PawnPromotion.Promote(
                     move.To,
                     color,
-                    promotionType.Value
+                    promotionType!.Value
                 );
 
             board.SetPiece(
@@ -156,8 +164,49 @@ public static class MoveExecutor
 
         piece.MarkAsMoved();
 
+        // =========================================================
+        // HALF-MOVE CLOCK
+        // =========================================================
+
+        UpdateHalfmoveClock(
+            board,
+            piece,
+            capturedPiece
+        );
+
         return true;
     }
+
+    // =============================================================
+    // HALF-MOVE CLOCK
+    // =============================================================
+
+    private static void UpdateHalfmoveClock(
+        Board board,
+        Piece movedPiece,
+        Piece? capturedPiece)
+    {
+        // A pawn move resets the fifty-move counter.
+        if (movedPiece.Type == PieceType.Pawn)
+        {
+            board.ResetHalfmoveClock();
+            return;
+        }
+
+        // A capture resets the fifty-move counter.
+        if (capturedPiece != null)
+        {
+            board.ResetHalfmoveClock();
+            return;
+        }
+
+        // Any other move increments the counter.
+        board.IncrementHalfmoveClock();
+    }
+
+    // =============================================================
+    // EN PASSANT
+    // =============================================================
 
     private static bool ExecuteEnPassant(
         Board board,
@@ -211,8 +260,16 @@ public static class MoveExecutor
 
         pawn.MarkAsMoved();
 
+        // En passant is a capture,
+        // therefore reset the half-move clock.
+        board.ResetHalfmoveClock();
+
         return true;
     }
+
+    // =============================================================
+    // KING-SIDE CASTLING
+    // =============================================================
 
     private static bool ExecuteKingSideCastling(
         Board board,
@@ -247,17 +304,40 @@ public static class MoveExecutor
             return false;
         }
 
-        board.SetPiece(kingTo, king);
-        board.SetPiece(kingFrom, null);
+        // Move king.
+        board.SetPiece(
+            kingTo,
+            king
+        );
 
-        board.SetPiece(rookTo, rook);
-        board.SetPiece(rookFrom, null);
+        board.SetPiece(
+            kingFrom,
+            null
+        );
+
+        // Move rook.
+        board.SetPiece(
+            rookTo,
+            rook
+        );
+
+        board.SetPiece(
+            rookFrom,
+            null
+        );
 
         king.MarkAsMoved();
         rook.MarkAsMoved();
 
+        // Castling is a non-pawn, non-capture move.
+        board.IncrementHalfmoveClock();
+
         return true;
     }
+
+    // =============================================================
+    // QUEEN-SIDE CASTLING
+    // =============================================================
 
     private static bool ExecuteQueenSideCastling(
         Board board,
@@ -292,14 +372,33 @@ public static class MoveExecutor
             return false;
         }
 
-        board.SetPiece(kingTo, king);
-        board.SetPiece(kingFrom, null);
+        // Move king.
+        board.SetPiece(
+            kingTo,
+            king
+        );
 
-        board.SetPiece(rookTo, rook);
-        board.SetPiece(rookFrom, null);
+        board.SetPiece(
+            kingFrom,
+            null
+        );
+
+        // Move rook.
+        board.SetPiece(
+            rookTo,
+            rook
+        );
+
+        board.SetPiece(
+            rookFrom,
+            null
+        );
 
         king.MarkAsMoved();
         rook.MarkAsMoved();
+
+        // Castling is a non-pawn, non-capture move.
+        board.IncrementHalfmoveClock();
 
         return true;
     }

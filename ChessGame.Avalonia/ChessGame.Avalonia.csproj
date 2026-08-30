@@ -1,4 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,17 +8,77 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.12" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.12" />
-    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
-      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
-      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+
+    <!-- Avalonia -->
+    <PackageReference Include="Avalonia"
+                      Version="12.0.0" />
+
+    <PackageReference Include="Avalonia.Desktop"
+                      Version="12.0.0" />
+
+    <PackageReference Include="Avalonia.Themes.Fluent"
+                      Version="12.0.0" />
+
+    <PackageReference Include="Avalonia.Fonts.Inter"
+                      Version="12.0.0" />
+
+    <!-- SVG -->
+    <PackageReference Include="Svg.Controls.Skia.Avalonia"
+                      Version="12.0.0" />
+
+    <!-- Diagnostics -->
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport"
+                      Version="2.2.3">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">
+        None
+      </IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">
+        All
+      </PrivateAssets>
     </PackageReference>
+
+  </ItemGroup>
+
+  <!-- ChessGame Core -->
+  <ItemGroup>
+
+    <ProjectReference Include="..\ChessGame.Core\ChessGame.Core.csproj" />
+
+  </ItemGroup>
+
+  <!-- ===================================================== -->
+  <!-- Chess SVG files                                      -->
+  <!-- ===================================================== -->
+
+  <ItemGroup>
+
+    <None Update="Assets\Pieces\*.svg"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+
+  </ItemGroup>
+
+  <!-- ===================================================== -->
+  <!-- Stockfish Engine                                     -->
+  <!-- ===================================================== -->
+
+  <ItemGroup>
+
+    <Content Include="..\Engine\stockfish-windows-x86-64-avx2.exe">
+      <Link>Engine\stockfish-windows-x86-64-avx2.exe</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChessGame.Core\ChessGame.Core.csproj" />
+
+    <Content Include="Assets\Sounds\*.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+
   </ItemGroup>
+
 </Project>

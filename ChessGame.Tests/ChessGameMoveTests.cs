@@ -46,6 +46,13 @@ public class ChessGameMoveTests
         // Clear the normal starting position.
         game.Board.Clear();
 
+        // Black is the side to move in this custom test position.
+        game.SetSideToMove(
+            PieceColor.Black
+        );
+
+        // White pawn on f5.
+
         // White pawn on f5.
         game.Board.SetPiece(
             new Position(3, 5),

@@ -6,126 +6,139 @@ namespace ChessGame.Tests;
 public class CheckDetectorTests
 {
     [Fact]
-    public void WhiteKing_ShouldBeInCheck_ByBlackRook()
+    public void BlackKing_ShouldBeInCheck_FromWhiteQueen()
     {
         var board = new Board();
 
+        board.Clear();
+
+        // White king
         board.SetPiece(
-            new Position(7, 4),
+            new Position(7, 7),
             new Piece(
                 PieceType.King,
                 PieceColor.White
             )
         );
 
+        // Black king
         board.SetPiece(
-            new Position(0, 4),
-            new Piece(
-                PieceType.Rook,
-                PieceColor.Black
-            )
-        );
-
-        Assert.True(
-            CheckDetector.IsInCheck(
-                board,
-                PieceColor.White
-            )
-        );
-    }
-
-    [Fact]
-    public void WhiteKing_ShouldNotBeInCheck_WhenPathIsBlocked()
-    {
-        var board = new Board();
-
-        board.SetPiece(
-            new Position(7, 4),
-            new Piece(
-                PieceType.King,
-                PieceColor.White
-            )
-        );
-
-        board.SetPiece(
-            new Position(0, 4),
-            new Piece(
-                PieceType.Rook,
-                PieceColor.Black
-            )
-        );
-
-        board.SetPiece(
-            new Position(4, 4),
-            new Piece(
-                PieceType.Pawn,
-                PieceColor.White
-            )
-        );
-
-        Assert.False(
-            CheckDetector.IsInCheck(
-                board,
-                PieceColor.White
-            )
-        );
-    }
-
-    [Fact]
-    public void BlackKing_ShouldBeInCheck_ByWhiteQueen()
-    {
-        var board = new Board();
-
-        board.SetPiece(
-            new Position(0, 4),
+            new Position(5, 6),
             new Piece(
                 PieceType.King,
                 PieceColor.Black
             )
         );
 
+        // White queen
         board.SetPiece(
-            new Position(4, 4),
+            new Position(6, 6),
             new Piece(
                 PieceType.Queen,
                 PieceColor.White
             )
         );
 
-        Assert.True(
+        bool result =
             CheckDetector.IsInCheck(
                 board,
                 PieceColor.Black
-            )
-        );
+            );
+
+        Assert.True(result);
     }
 
     [Fact]
-    public void King_ShouldNotBeInCheck_OnSafeSquare()
+    public void WhiteKing_ShouldBeInCheck_FromBlackQueen()
     {
         var board = new Board();
 
+        board.Clear();
+
+        // Black king
         board.SetPiece(
-            new Position(7, 4),
+            new Position(0, 7),
+            new Piece(
+                PieceType.King,
+                PieceColor.Black
+            )
+        );
+
+        // White king
+        board.SetPiece(
+            new Position(2, 6),
             new Piece(
                 PieceType.King,
                 PieceColor.White
             )
         );
 
+        // Black queen
         board.SetPiece(
-            new Position(0, 0),
+            new Position(1, 6),
             new Piece(
-                PieceType.Rook,
+                PieceType.Queen,
                 PieceColor.Black
             )
         );
 
-        Assert.False(
+        bool result =
             CheckDetector.IsInCheck(
                 board,
                 PieceColor.White
+            );
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void BlackKing_ShouldNotBeInCheck_InStalematePosition()
+    {
+        var board = new Board();
+
+        board.Clear();
+
+        // -----------------------------------------------------
+        // Known stalemate position:
+        //
+        // Black King: h8
+        // White King: f7
+        // White Queen: g6
+        // -----------------------------------------------------
+
+        // Black king: h8
+        board.SetPiece(
+            new Position(0, 7),
+            new Piece(
+                PieceType.King,
+                PieceColor.Black
             )
         );
+
+        // White king: f7
+        board.SetPiece(
+            new Position(1, 5),
+            new Piece(
+                PieceType.King,
+                PieceColor.White
+            )
+        );
+
+        // White queen: g6
+        board.SetPiece(
+            new Position(2, 6),
+            new Piece(
+                PieceType.Queen,
+                PieceColor.White
+            )
+        );
+
+        bool result =
+            CheckDetector.IsInCheck(
+                board,
+                PieceColor.Black
+            );
+
+        Assert.False(result);
     }
 }
