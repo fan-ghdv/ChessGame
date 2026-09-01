@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ChessGame.Avalonia;
@@ -259,6 +260,12 @@ public partial class MainWindow : Window
 
         ExitHistoryButton.IsVisible = false;
 
+        PreviousHistoryButton.IsVisible = false;
+        NextHistoryButton.IsVisible = false;
+
+        PreviousHistoryButton.IsEnabled = false;
+        NextHistoryButton.IsEnabled = false;
+
 
         // =========================================================
         // CREATE BOARD
@@ -268,18 +275,13 @@ public partial class MainWindow : Window
 
         UpdateMoveHistory();
 
+        UpdateCapturedPieces();
+
         UpdateGameState();
 
         // =========================================================
         // AI FIRST MOVE
         // =========================================================
-        //
-        // If the player chose Black,
-        // AI controls White.
-        //
-        // White moves first in chess,
-        // so AI must make the first move immediately.
-        //
 
         if (selectedGameMode == GameMode.AI &&
             actualPlayerColor == PlayerColorChoice.Black)
@@ -292,7 +294,7 @@ public partial class MainWindow : Window
 
     private readonly HashSet<Position> legalMovePositions = new();
 
-    private bool showLegalMoves = false;
+    private bool showLegalMoves = true;
 
     private bool blackPerspective = false;
 
@@ -303,10 +305,6 @@ public partial class MainWindow : Window
     // =========================================================
 
     private bool aiThinking = false;
-
-    private bool gameOverDialogShown = false;
-
-    private Button? exitHistoryButton;
 
     // =========================================================
     // MOVE HISTORY VIEW MODE
@@ -332,7 +330,6 @@ public partial class MainWindow : Window
         object? sender,
         ScrollChangedEventArgs e)
     {
-        // Ignore scrolling caused by our own ScrollToEnd().
         if (moveHistoryAutoScrolling)
         {
             return;
@@ -355,12 +352,10 @@ public partial class MainWindow : Window
 
         if (isAtBottom)
         {
-            // User is at the bottom.
             moveHistoryUserScrolled = false;
         }
         else
         {
-            // User manually scrolled away from the bottom.
             moveHistoryUserScrolled = true;
         }
     }
@@ -443,6 +438,12 @@ public partial class MainWindow : Window
 
         RotateBoardButton.IsVisible = false;
         ExitHistoryButton.IsVisible = false;
+
+        PreviousHistoryButton.IsVisible = false;
+        NextHistoryButton.IsVisible = false;
+
+        PreviousHistoryButton.IsEnabled = false;
+        NextHistoryButton.IsEnabled = false;
 
     }
 
@@ -684,6 +685,7 @@ public partial class MainWindow : Window
         }
 
         CreateBoard();
+        UpdateCapturedPieces();
     }
 
     private void AddCastlingMovePositions(
@@ -722,21 +724,9 @@ public partial class MainWindow : Window
         // KING-SIDE CASTLING
         // =========================================================
 
-        Piece? kingSideRook =
-            _game.Board.GetPiece(
-                new Position(kingRow, 7)
-            );
-
-        if (kingSideRook != null &&
-            kingSideRook.Type == PieceType.Rook &&
-            kingSideRook.Color == color &&
-            !kingSideRook.HasMoved &&
-            _game.Board.GetPiece(
-                new Position(kingRow, 5)
-            ) == null &&
-            _game.Board.GetPiece(
-                new Position(kingRow, 6)
-            ) == null)
+        if (CastlingValidator.CanCastleKingSide(
+                _game.Board,
+                color))
         {
             castlingMovePositions.Add(
                 new Position(kingRow, 6)
@@ -747,24 +737,9 @@ public partial class MainWindow : Window
         // QUEEN-SIDE CASTLING
         // =========================================================
 
-        Piece? queenSideRook =
-            _game.Board.GetPiece(
-                new Position(kingRow, 0)
-            );
-
-        if (queenSideRook != null &&
-            queenSideRook.Type == PieceType.Rook &&
-            queenSideRook.Color == color &&
-            !queenSideRook.HasMoved &&
-            _game.Board.GetPiece(
-                new Position(kingRow, 1)
-            ) == null &&
-            _game.Board.GetPiece(
-                new Position(kingRow, 2)
-            ) == null &&
-            _game.Board.GetPiece(
-                new Position(kingRow, 3)
-            ) == null)
+        if (CastlingValidator.CanCastleQueenSide(
+                _game.Board,
+                color))
         {
             castlingMovePositions.Add(
                 new Position(kingRow, 2)
@@ -1172,8 +1147,6 @@ public partial class MainWindow : Window
                     ? PieceColor.White
                     : PieceColor.Black;
 
-            // It is currently AI's turn.
-            // Player must NOT be able to interact with the board.
             if (_game.SideToMove != playerColor)
             {
                 return;
@@ -1214,6 +1187,7 @@ public partial class MainWindow : Window
             );
 
             CreateBoard();
+            UpdateCapturedPieces();
 
             return;
         }
@@ -1238,6 +1212,7 @@ public partial class MainWindow : Window
             castlingMovePositions.Clear();
 
             CreateBoard();
+            UpdateCapturedPieces();
 
             return;
         }
@@ -1258,6 +1233,7 @@ public partial class MainWindow : Window
             );
 
             CreateBoard();
+            UpdateCapturedPieces();
 
             return;
         }
@@ -1318,6 +1294,7 @@ public partial class MainWindow : Window
             );
 
         if (success &&
+            movingPiece != null &&
             SoundEffectsToggle.IsChecked == true)
         {
             ChessSoundPlayer.Play(
@@ -1358,7 +1335,6 @@ public partial class MainWindow : Window
         else if (selectedGameMode ==
                 GameMode.AI)
         {
-            // Keep the player's chosen perspective.
             blackPerspective =
                 actualPlayerColor ==
                 PlayerColorChoice.Black;
@@ -1367,6 +1343,8 @@ public partial class MainWindow : Window
         CreateBoard();
 
         UpdateMoveHistory();
+
+        UpdateCapturedPieces();
 
         UpdateGameState();
 
@@ -1395,6 +1373,7 @@ public partial class MainWindow : Window
         );
 
         CreateBoard();
+        UpdateCapturedPieces();
     }
 
     // =========================================================
@@ -1660,18 +1639,12 @@ public partial class MainWindow : Window
 
             if (selectedGameMode == GameMode.AI)
             {
-                // AI mode:
-                // Always keep the board from the player's perspective.
-
                 blackPerspective =
                     actualPlayerColor ==
                     PlayerColorChoice.Black;
             }
             else
             {
-                // Local Player mode:
-                // Perspective follows the current turn.
-
                 RestoreCurrentGamePerspective();
             }
 
@@ -1683,6 +1656,8 @@ public partial class MainWindow : Window
             CreateBoard();
 
             UpdateMoveHistory();
+
+            UpdateCapturedPieces();
 
             UpdateGameState();
 
@@ -1707,8 +1682,6 @@ public partial class MainWindow : Window
                     playerColor == PieceColor.White
                         ? PieceColor.Black
                         : PieceColor.White;
-
-                // Make sure it is actually AI's turn.
 
                 if (_game.SideToMove == aiColor)
                 {
@@ -1736,6 +1709,7 @@ public partial class MainWindow : Window
         );
 
         CreateBoard();
+        UpdateCapturedPieces();
     }
 
     // =========================================================
@@ -1832,11 +1806,6 @@ public partial class MainWindow : Window
 
         for (int i = 0; i < history.Count; i += 2)
         {
-            // =====================================================
-            // IMPORTANT
-            // SAVE MOVE NUMBERS BEFORE LAMBDA
-            // =====================================================
-
             int whiteMoveNumber =
                 i + 1;
 
@@ -1905,8 +1874,6 @@ public partial class MainWindow : Window
                     FormatMove(whiteMove)
                 );
 
-            // IMPORTANT:
-            // Do NOT use i directly inside the lambda.
             whiteButton.Click +=
                 (_, _) =>
                 {
@@ -1914,9 +1881,16 @@ public partial class MainWindow : Window
                         $"History clicked: move {whiteMoveNumber}"
                     );
 
+                    if (aiThinking)
+                    {
+                        FooterStatusText.Text = "Waiting for AI...";
+                        return;
+                    }
+
                     ShowHistoryPosition(
                         whiteMoveNumber
                     );
+
                 };
 
             Grid.SetColumn(
@@ -1942,14 +1916,18 @@ public partial class MainWindow : Window
                         FormatMove(blackMove)
                     );
 
-                // IMPORTANT:
-                // Do NOT use i directly inside the lambda.
                 blackButton.Click +=
                     (_, _) =>
                     {
                         Console.WriteLine(
                             $"History clicked: move {blackMoveNumber}"
                         );
+
+                        if (aiThinking)
+                        {
+                            FooterStatusText.Text = "Waiting for AI...";
+                            return;
+                        }
 
                         ShowHistoryPosition(
                             blackMoveNumber
@@ -2025,87 +2003,68 @@ public partial class MainWindow : Window
         };
     }
 
-    // =========================================================
-    // SHOW HISTORY POSITION
-    // =========================================================
-
-    private void ShowHistoryPosition(
-        int moveCount)
+    private void UpdateHistoryNavigationButtons()
     {
-        Console.WriteLine(
-            $"ShowHistoryPosition called: {moveCount}"
-        );
-
-        // =========================================================
-        // VALIDATE
-        // =========================================================
-
-        IReadOnlyList<MoveRecord> history =
-            _game.MoveHistory.GetAll();
-
-        if (moveCount < 1 ||
-            moveCount > history.Count)
+        if (!viewingHistory)
         {
-            Console.WriteLine(
-                $"Invalid history move count: {moveCount}"
-            );
-
+            PreviousHistoryButton.IsVisible = false;
+            NextHistoryButton.IsVisible = false;
             return;
         }
 
-        // =========================================================
-        // CREATE HISTORY GAME
-        // =========================================================
+        PreviousHistoryButton.IsVisible = true;
+        NextHistoryButton.IsVisible = true;
 
-        ChessGame.Core.Game.ChessGame historyGame =
-            CreateGameAtMove(
-                moveCount
-            );
+        PreviousHistoryButton.IsEnabled =
+            viewingMoveCount > 0;
 
-        // =========================================================
-        // ENTER HISTORY VIEW
-        // =========================================================
+        NextHistoryButton.IsEnabled =
+            viewingMoveCount < _game.MoveHistory.Count;
+    }
 
-        viewingHistory = true;
+    private void PreviousHistoryButton_Click(
+        object? sender,
+        RoutedEventArgs e)
+    {
+        if (!viewingHistory)
+        {
+            return;
+        }
 
-        viewingMoveCount =
-            moveCount;
+        if (viewingMoveCount <= 0)
+        {
+            return;
+        }
 
-        historyViewGame =
-            historyGame;
-
-        ExitHistoryButton.IsVisible = true;
-        RotateBoardButton.IsVisible = true;
-
-        selectedPosition = null;
-
-        // =========================================================
-        // DISPLAY HISTORY BOARD
-        // =========================================================
-
-        CreateBoard(
-            historyGame
+        ShowHistoryPosition(
+            viewingMoveCount - 1
         );
 
-        // =========================================================
-        // UPDATE STATUS
-        // =========================================================
+        UpdateHistoryNavigationButtons();
+    }
 
-        StatusText.Text =
-            $"Viewing move {moveCount}";
+    private void NextHistoryButton_Click(
+        object? sender,
+        RoutedEventArgs e)
+    {
+        if (!viewingHistory)
+        {
+            return;
+        }
 
-        FooterStatusText.Text =
-            $"Viewing move {moveCount}. Board is read-only";
+        int maxMoveCount =
+            _game.MoveHistory.Count;
 
-        TurnText.Text =
-            historyGame.SideToMove ==
-                PieceColor.White
-                    ? "White"
-                    : "Black";
+        if (viewingMoveCount >= maxMoveCount)
+        {
+            return;
+        }
 
-        Console.WriteLine(
-            $"Viewing history at move {moveCount}"
+        ShowHistoryPosition(
+            viewingMoveCount + 1
         );
+
+        UpdateHistoryNavigationButtons();
     }
 
     // =========================================================
@@ -2350,6 +2309,502 @@ public partial class MainWindow : Window
         );
     }
 
+    private static bool CaptureMessageIsStillActive(
+        IReadOnlyList<MoveRecord> history,
+        MoveRecord captureRecord)
+    {
+        // =====================================================
+        // FIND CAPTURE RECORD INDEX
+        // =====================================================
+
+        int captureIndex =
+            -1;
+
+        for (int i = 0; i < history.Count; i++)
+        {
+            if (ReferenceEquals(
+                    history[i],
+                    captureRecord))
+            {
+                captureIndex = i;
+                break;
+            }
+        }
+
+        if (captureIndex < 0)
+        {
+            return false;
+        }
+
+        // =====================================================
+        // CHECK MOVES AFTER THE CAPTURE
+        // =====================================================
+
+        for (
+            int i = captureIndex + 1;
+            i < history.Count;
+            i++)
+        {
+            MoveRecord laterMove =
+                history[i];
+
+            // =================================================
+            // SAME SIDE MOVED AGAIN
+            // =================================================
+
+            if (laterMove.Color ==
+                captureRecord.Color)
+            {
+                return false;
+            }
+        }
+
+        // =====================================================
+        // SAME SIDE HAS NOT MOVED AGAIN
+        // =====================================================
+
+        return true;
+    }
+
+    // =========================================================
+    // UPDATE CAPTURED PIECES
+    // =========================================================
+
+    private void UpdateCapturedPieces(
+        IReadOnlyList<MoveRecord>? history = null)
+    {
+        // =====================================================
+        // CLEAR OLD PIECES
+        // =====================================================
+
+        PlayerCapturedPieces.Children.Clear();
+        OpponentCapturedPieces.Children.Clear();
+
+        // =====================================================
+        // CLEAR OLD CAPTURE MESSAGES
+        // =====================================================
+
+        PlayerCaptureMessageText.Text = "";
+        OpponentCaptureMessageText.Text = "";
+
+        // =====================================================
+        // SCORE
+        // =====================================================
+
+        int playerScore = 0;
+        int opponentScore = 0;
+
+        // =====================================================
+        // GET HISTORY
+        // =====================================================
+
+        if (history == null)
+        {
+            if (viewingHistory &&
+                historyViewGame != null)
+            {
+                history =
+                    historyViewGame.MoveHistory.GetAll();
+            }
+            else
+            {
+                history =
+                    _game.MoveHistory.GetAll();
+            }
+        }
+
+        // =====================================================
+        // DETERMINE CAPTURED PIECE COLOR BY BOARD PERSPECTIVE
+        // =====================================================
+
+        PieceColor topCapturedColor =
+            blackPerspective
+                ? PieceColor.Black
+                : PieceColor.White;
+
+        PieceColor bottomCapturedColor =
+            blackPerspective
+                ? PieceColor.White
+                : PieceColor.Black;
+
+        // =====================================================
+        // CREATE CAPTURED PIECE IMAGES
+        // =====================================================
+
+        foreach (MoveRecord record in history)
+        {
+            Piece? capturedPiece =
+                record.CapturedPiece;
+
+            if (capturedPiece == null)
+            {
+                continue;
+            }
+
+            string imagePath =
+                GetPieceImagePath(
+                    capturedPiece
+                );
+
+            if (!File.Exists(imagePath))
+            {
+                Console.WriteLine(
+                    $"CAPTURED SVG NOT FOUND: {imagePath}"
+                );
+
+                continue;
+            }
+
+            try
+            {
+                // =================================================
+                // BASE URI
+                // =================================================
+
+                var baseUri =
+                    new Uri(
+                        AppContext.BaseDirectory,
+                        UriKind.Absolute
+                    );
+
+                // =================================================
+                // CREATE SVG
+                // =================================================
+
+                var svg =
+                    new global::Avalonia.Svg.Skia.Svg(
+                        baseUri
+                    );
+
+                svg.Path =
+                    imagePath;
+
+                // =================================================
+                // CAPTURED PIECE SIZE
+                // =================================================
+
+                double pieceSize =
+                    capturedPiece.Type ==
+                        PieceType.Pawn
+                            ? 30
+                            : 36;
+
+                svg.Width =
+                    pieceSize;
+
+                svg.Height =
+                    pieceSize;
+
+                // =================================================
+                // SVG DISPLAY
+                // =================================================
+
+                svg.Stretch =
+                    Stretch.Uniform;
+
+                svg.HorizontalAlignment =
+                    HorizontalAlignment.Center;
+
+                svg.VerticalAlignment =
+                    VerticalAlignment.Center;
+
+                svg.Margin =
+                    new Thickness(0);
+
+                svg.EnableCache =
+                    true;
+
+                svg.Wireframe =
+                    false;
+
+                svg.DisableFilters =
+                    false;
+
+                // =====================================================
+                // TOP / BOTTOM BY CAPTURED PIECE COLOR
+                // =====================================================
+
+                if (capturedPiece.Color == topCapturedColor)
+                {
+                    PlayerCapturedPieces.Children.Add(
+                        svg
+                    );
+
+                    playerScore +=
+                        GetCapturedPieceScore(
+                            capturedPiece.Type
+                        );
+                }
+                else if (capturedPiece.Color == bottomCapturedColor)
+                {
+                    OpponentCapturedPieces.Children.Add(
+                        svg
+                    );
+
+                    opponentScore +=
+                        GetCapturedPieceScore(
+                            capturedPiece.Type
+                        );
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"CAPTURED SVG ERROR: {imagePath}"
+                );
+
+                Console.WriteLine(
+                    ex.ToString()
+                );
+            }
+        }
+
+        // =====================================================
+        // UPDATE SCORES
+        // =====================================================
+
+        PlayerScoreText.Text =
+            $"SCORE: {playerScore}";
+
+        OpponentScoreText.Text =
+            $"SCORE: {opponentScore}";
+
+        // =====================================================
+        // CAPTURE MESSAGE
+        // =====================================================
+
+        MoveRecord? topLastCapture = null;
+        MoveRecord? bottomLastCapture = null;
+
+        // =====================================================
+        // FIND LAST CAPTURE FOR TOP / BOTTOM COLOR
+        // =====================================================
+
+        for (int i = 0; i < history.Count; i++)
+        {
+            MoveRecord record =
+                history[i];
+
+            Piece? capturedPiece =
+                record.CapturedPiece;
+
+            if (capturedPiece == null)
+            {
+                continue;
+            }
+
+            // -------------------------------------------------
+            // TOP
+            // -------------------------------------------------
+
+            if (capturedPiece.Color == topCapturedColor)
+            {
+                topLastCapture = record;
+            }
+
+            // -------------------------------------------------
+            // BOTTOM
+            // -------------------------------------------------
+
+            else if (capturedPiece.Color == bottomCapturedColor)
+            {
+                bottomLastCapture = record;
+            }
+        }
+
+        // =====================================================
+        // CHECK TOP MESSAGE
+        // =====================================================
+
+        if (topLastCapture != null &&
+            CaptureMessageIsStillActive(
+                history,
+                topLastCapture
+            ))
+        {
+            Piece capturedPiece =
+                topLastCapture.CapturedPiece!;
+
+            int captureScore =
+                GetCapturedPieceScore(
+                    capturedPiece.Type
+                );
+
+            string pieceName =
+                GetCapturedPieceName(
+                    capturedPiece.Type
+                );
+
+            PlayerCaptureMessageText.Text =
+                $"{pieceName} Captured!   +{captureScore}";
+
+            PlayerCaptureMessageText.IsVisible =
+                true;
+        }
+
+        // =====================================================
+        // CHECK BOTTOM MESSAGE
+        // =====================================================
+
+        if (bottomLastCapture != null &&
+            CaptureMessageIsStillActive(
+                history,
+                bottomLastCapture
+            ))
+        {
+            Piece capturedPiece =
+                bottomLastCapture.CapturedPiece!;
+
+            int captureScore =
+                GetCapturedPieceScore(
+                    capturedPiece.Type
+                );
+
+            string pieceName =
+                GetCapturedPieceName(
+                    capturedPiece.Type
+                );
+
+            OpponentCaptureMessageText.Text =
+                $"{pieceName} Captured!   +{captureScore}";
+
+            OpponentCaptureMessageText.IsVisible =
+                true;
+        }
+    }
+
+    // =========================================================
+    // GET CAPTURED PIECE SCORE
+    // =========================================================
+
+    private static int GetCapturedPieceScore(
+        PieceType type)
+    {
+        return type switch
+        {
+            PieceType.Pawn   => 1,
+            PieceType.Knight => 3,
+            PieceType.Bishop => 3,
+            PieceType.Rook   => 5,
+            PieceType.Queen  => 9,
+            _ => 0
+        };
+    }
+
+    // =========================================================
+    // SHOW HISTORY POSITION
+    // =========================================================
+
+    private void ShowHistoryPosition(
+        int moveCount)
+    {
+        if (aiThinking)
+        {
+            FooterStatusText.Text = "Waiting for AI...";
+            return;
+        }
+        Console.WriteLine(
+            $"ShowHistoryPosition called: {moveCount}"
+        );
+
+        // =========================================================
+        // VALIDATE
+        // =========================================================
+
+        IReadOnlyList<MoveRecord> history =
+            _game.MoveHistory.GetAll();
+
+        if (moveCount < 1 ||
+            moveCount > history.Count)
+        {
+            Console.WriteLine(
+                $"Invalid history move count: {moveCount}"
+            );
+
+            return;
+        }
+
+        // =========================================================
+        // CREATE HISTORY GAME
+        // =========================================================
+
+        ChessGame.Core.Game.ChessGame historyGame =
+            CreateGameAtMove(
+                moveCount
+            );
+
+        // =========================================================
+        // ENTER HISTORY VIEW
+        // =========================================================
+
+        viewingHistory = true;
+
+        viewingMoveCount =
+            moveCount;
+
+        historyViewGame =
+            historyGame;
+
+        ExitHistoryButton.IsVisible = true;
+        RotateBoardButton.IsVisible = true;
+
+        UpdateHistoryNavigationButtons();
+
+        selectedPosition = null;
+
+        legalMovePositions.Clear();
+        castlingMovePositions.Clear();
+
+        // =========================================================
+        // DISPLAY HISTORY BOARD
+        // =========================================================
+
+        CreateBoard(
+            historyGame
+        );
+
+        // =========================================================
+        // UPDATE CAPTURED PIECES
+        // =========================================================
+
+        List<MoveRecord> visibleHistory =
+            history
+                .Take(moveCount)
+                .ToList();
+
+        UpdateCapturedPieces(
+            visibleHistory
+        );
+
+        // =========================================================
+        // UPDATE STATUS
+        // =========================================================
+
+        StatusText.Text =
+            $"Viewing move {moveCount}";
+
+        FooterStatusText.Text =
+            $"Viewing move {moveCount}. Board is read-only";
+
+        TurnText.Text =
+            historyGame.SideToMove ==
+                PieceColor.White
+                    ? "White"
+                    : "Black";
+
+        // =========================================================
+        // DEBUG
+        // =========================================================
+
+        Console.WriteLine(
+            $"Viewing history at move {moveCount}"
+        );
+
+        Console.WriteLine(
+            $"Captured records shown: {visibleHistory.Count}"
+        );
+    }
+
     // =========================================================
     // POSITION -> CHESS NOTATION
     // =========================================================
@@ -2391,6 +2846,11 @@ public partial class MainWindow : Window
         if (ExitHistoryButton != null)
         {
             ExitHistoryButton.IsVisible = false;
+            PreviousHistoryButton.IsVisible = false;
+            NextHistoryButton.IsVisible = false;
+
+            PreviousHistoryButton.IsEnabled = false;
+            NextHistoryButton.IsEnabled = false;
         }
 
         if (RotateBoardButton != null)
@@ -2478,7 +2938,6 @@ public partial class MainWindow : Window
                     "Nothing to undo."
                 );
 
-                // Keep player's perspective.
                 blackPerspective =
                     actualPlayerColor.Value ==
                     PlayerColorChoice.Black;
@@ -2486,6 +2945,8 @@ public partial class MainWindow : Window
                 CreateBoard();
 
                 UpdateMoveHistory();
+
+                UpdateCapturedPieces();
 
                 UpdateGameState();
 
@@ -2495,33 +2956,6 @@ public partial class MainWindow : Window
 
             // =====================================================
             // BLACK PLAYER SPECIAL CASE
-            // =====================================================
-            //
-            // Black is the human player.
-            //
-            // AI White automatically makes the first move.
-            //
-            // Example:
-            //
-            // Initial position
-            //        ↓
-            // AI White move
-            //        ↓
-            // Black player's first turn
-            //
-            // At this point MoveHistory.Count == 1.
-            //
-            // The player has NOT made a move yet.
-            //
-            // Therefore Undo must do NOTHING.
-            //
-            // It must NOT:
-            //
-            // - undo the AI opening move
-            // - reset the board
-            // - start AI again
-            // - change perspective
-            //
             // =====================================================
 
             if (playerColor == PieceColor.Black &&
@@ -2541,23 +2975,6 @@ public partial class MainWindow : Window
 
             // =====================================================
             // NORMAL AI MODE UNDO
-            // =====================================================
-            //
-            // At this point there are at least two moves:
-            //
-            // Example 1:
-            //
-            // Player White
-            // AI Black
-            //
-            //
-            // Example 2:
-            //
-            // AI White
-            // Player Black
-            //
-            //
-            // Therefore undo BOTH moves.
             // =====================================================
 
             if (moveCount >= 2)
@@ -2609,12 +3026,6 @@ public partial class MainWindow : Window
             // =====================================================
             // KEEP PLAYER'S PERSPECTIVE
             // =====================================================
-            //
-            // Undo must NEVER change the player's perspective.
-            //
-            // White player -> White perspective
-            // Black player -> Black perspective
-            //
 
             blackPerspective =
                 actualPlayerColor.Value ==
@@ -2627,9 +3038,6 @@ public partial class MainWindow : Window
 
             gameOver = false;
 
-            gameOverDialogShown = false;
-
-
             // =====================================================
             // REDRAW
             // =====================================================
@@ -2638,43 +3046,13 @@ public partial class MainWindow : Window
 
             UpdateMoveHistory();
 
+            UpdateCapturedPieces();
+
             UpdateGameState();
 
 
             // =====================================================
             // AI TURN AFTER UNDO
-            // =====================================================
-            //
-            // After undoing:
-            //
-            // Player White:
-            //
-            // Initial
-            //   ↓
-            // White Player
-            //   ↓
-            // Black AI
-            //   ↓
-            // Undo both
-            //   ↓
-            // White Player
-            //
-            // So AI does NOT move immediately.
-            //
-            //
-            // Player Black:
-            //
-            // Initial
-            //   ↓
-            // White AI
-            //   ↓
-            // Black Player
-            //   ↓
-            // Undo both
-            //   ↓
-            // White AI
-            //
-            // Therefore AI MUST move again.
             // =====================================================
 
             if (_game.SideToMove == aiColor)
@@ -2741,6 +3119,8 @@ public partial class MainWindow : Window
 
             UpdateMoveHistory();
 
+            UpdateCapturedPieces();
+
             UpdateGameState();
 
             return;
@@ -2760,9 +3140,6 @@ public partial class MainWindow : Window
 
         gameOver = false;
 
-        gameOverDialogShown = false;
-
-
         // =========================================================
         // REDRAW
         // =========================================================
@@ -2770,6 +3147,8 @@ public partial class MainWindow : Window
         CreateBoard();
 
         UpdateMoveHistory();
+
+        UpdateCapturedPieces();
 
         UpdateGameState();
 
@@ -2817,6 +3196,11 @@ public partial class MainWindow : Window
         if (ExitHistoryButton != null)
         {
             ExitHistoryButton.IsVisible = false;
+            PreviousHistoryButton.IsVisible = false;
+            NextHistoryButton.IsVisible = false;
+
+            PreviousHistoryButton.IsEnabled = false;
+            NextHistoryButton.IsEnabled = false;
         }
 
         if (RotateBoardButton != null)
@@ -2831,9 +3215,6 @@ public partial class MainWindow : Window
 
         gameOver = false;
 
-        gameOverDialogShown = false;
-
-
         // =========================================================
         // CREATE COMPLETELY NEW CHESS GAME
         // =========================================================
@@ -2842,6 +3223,8 @@ public partial class MainWindow : Window
             new ChessGame.Core.Game.ChessGame();
 
         aiThinking = false;
+
+        UpdateAIThinkingUI();
 
         // =========================================================
         // DETERMINE PLAYER COLOR
@@ -2856,10 +3239,6 @@ public partial class MainWindow : Window
             if (selectedPlayerColor ==
                 PlayerColorChoice.Random)
             {
-                // Randomize THIS game only.
-                //
-                // Do NOT modify selectedPlayerColor.
-
                 actualPlayerColor =
                     Random.Shared.Next(2) == 0
                         ? PlayerColorChoice.White
@@ -2942,6 +3321,8 @@ public partial class MainWindow : Window
 
     UpdateMoveHistory();
 
+    UpdateCapturedPieces();
+
 
     // =========================================================
     // UPDATE GAME STATE
@@ -3014,26 +3395,12 @@ public partial class MainWindow : Window
 
     // =========================================================
     // RESTORE CURRENT GAME PERSPECTIVE
-    //
-    // White to move:
-    //     Top    = 8
-    //     Bottom = 1
-    //
-    // Black to move:
-    //     Top    = 1
-    //     Bottom = 8
     // =========================================================
 
     private void RestoreCurrentGamePerspective()
     {
         // =========================================================
         // AI MODE
-        // =========================================================
-        //
-        // In AI mode, the board must ALWAYS stay from
-        // the player's perspective.
-        //
-        // Undo must NOT change the player's side.
         // =========================================================
 
         if (selectedGameMode == GameMode.AI)
@@ -3057,10 +3424,6 @@ public partial class MainWindow : Window
 
         // =========================================================
         // LOCAL PLAYER MODE
-        // =========================================================
-        //
-        // Local Player changes perspective according to
-        // whose turn it is.
         // =========================================================
 
         if (_game.SideToMove == PieceColor.White)
@@ -3112,14 +3475,16 @@ public partial class MainWindow : Window
 
         ExitHistoryButton.IsVisible = false;
 
+        PreviousHistoryButton.IsVisible = false;
+        NextHistoryButton.IsVisible = false;
+
+        PreviousHistoryButton.IsEnabled = false;
+        NextHistoryButton.IsEnabled = false;
+
         RotateBoardButton.IsVisible = false;
 
         // =========================================================
         // RESTORE REAL CURRENT GAME PERSPECTIVE
-        //
-        // IMPORTANT:
-        // This uses _game.SideToMove.
-        // It does NOT use the move that was being viewed.
         // =========================================================
 
         RestoreCurrentGamePerspective();
@@ -3137,6 +3502,12 @@ public partial class MainWindow : Window
         // =========================================================
 
         UpdateMoveHistory();
+
+        // =========================================================
+        // RESTORE CAPTURED PIECES + SCORE + MESSAGE
+        // =========================================================
+
+        UpdateCapturedPieces();
 
         // =========================================================
         // RESTORE GAME STATE
@@ -3157,6 +3528,12 @@ public partial class MainWindow : Window
         object? sender,
         RoutedEventArgs e)
     {
+        if (aiThinking)
+        {
+            FooterStatusText.Text = "Waiting for AI...";
+            return;
+        }
+
         UndoMove();
     }
 
@@ -3440,6 +3817,20 @@ public partial class MainWindow : Window
         // RETURN TO MAIN MENU
         // =========================================================
 
+        selectedPosition = null;
+
+        legalMovePositions.Clear();
+
+        castlingMovePositions.Clear();
+
+        viewingHistory = false;
+
+        historyViewGame = null;
+
+        viewingMoveCount = 0;
+
+        ChessBoard.Children.Clear();
+
         ShowMainMenu();
     }
 
@@ -3447,10 +3838,8 @@ public partial class MainWindow : Window
     {
         if (_game.SideToMove == PieceColor.White)
         {
-            // White's turn
             TurnPieceIcon.Text = "♔";
 
-            // Black icon on white background
             TurnPieceIcon.Foreground =
                 new SolidColorBrush(
                     Color.Parse("#000000")
@@ -3463,10 +3852,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            // Black's turn
             TurnPieceIcon.Text = "♚";
 
-            // White icon on black background
             TurnPieceIcon.Foreground =
                 new SolidColorBrush(
                     Color.Parse("#FFFFFF")
@@ -3499,9 +3886,6 @@ public partial class MainWindow : Window
         {
             gameOver = false;
 
-            // Reset dialog state for the next game over.
-            gameOverDialogShown = false;
-
             string color =
                 _game.SideToMove == PieceColor.White
                     ? "White"
@@ -3523,8 +3907,6 @@ public partial class MainWindow : Window
         // GAME OVER
         // =====================================================
 
-        // Remember whether the game was already over
-        // before this method was called.
         bool wasAlreadyGameOver = gameOver;
 
         gameOver = true;
@@ -3598,15 +3980,8 @@ public partial class MainWindow : Window
         TurnText.Text =
             "END";
 
-        // =====================================================
-        // SHOW GAME OVER DIALOG
-        // ONLY WHEN GAME HAS JUST ENDED
-        // =====================================================
-
         if (!wasAlreadyGameOver)
         {
-            gameOverDialogShown = true;
-
             ShowGameOverDialog(
                 resultText,
                 reasonText
@@ -3850,10 +4225,6 @@ public partial class MainWindow : Window
         object? sender,
         RoutedEventArgs e)
     {
-        // =========================================================
-        // ROTATE IS ONLY AVAILABLE IN READ-ONLY / HISTORY MODE
-        // =========================================================
-
         if (!viewingHistory ||
             historyViewGame == null)
         {
@@ -4184,10 +4555,11 @@ public partial class MainWindow : Window
 
         aiThinking = true;
 
+        UpdateAIThinkingUI();
+
         try
         {
-            // Small delay so the AI does not move instantly.
-            await Task.Delay(1000);
+            await Task.Delay(1500);
 
 
             // =====================================================
@@ -4409,6 +4781,8 @@ public partial class MainWindow : Window
 
             UpdateMoveHistory();
 
+            UpdateCapturedPieces();
+
             UpdateGameState();
 
 
@@ -4437,6 +4811,8 @@ public partial class MainWindow : Window
             // =====================================================
 
             aiThinking = false;
+
+            UpdateAIThinkingUI();
         }
     }
 
@@ -4484,9 +4860,43 @@ public partial class MainWindow : Window
                     );
                 });
         }
-        catch (Exception ex)
+        catch
         {
         }
+    }
+
+    private void UpdateAIThinkingUI()
+    {
+        if (aiThinking)
+        {
+            UndoButton.IsEnabled = false;
+
+            FooterStatusText.Text =
+                "Waiting for AI...";
+
+            return;
+        }
+
+        UndoButton.IsEnabled = true;
+
+        FooterStatusText.Text =
+            _game.SideToMove == PieceColor.White
+                ? "White to move"
+                : "Black to move";
+    }
+
+    private static string GetCapturedPieceName(
+        PieceType type)
+    {
+        return type switch
+        {
+            PieceType.Pawn   => "Pawn",
+            PieceType.Knight => "Knight",
+            PieceType.Bishop => "Bishop",
+            PieceType.Rook   => "Rook",
+            PieceType.Queen  => "Queen",
+            _ => "Piece"
+        };
     }
 }
 

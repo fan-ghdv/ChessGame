@@ -15,17 +15,6 @@ public sealed class StockfishEngine : IDisposable
     // LAST PROMOTION
     // =========================================================
 
-    /// <summary>
-    /// Promotion piece returned by Stockfish.
-    ///
-    /// Example:
-    /// e7e8q -> Queen
-    /// e7e8r -> Rook
-    /// e7e8b -> Bishop
-    /// e7e8n -> Knight
-    ///
-    /// null = normal move
-    /// </summary>
     public PieceType? LastPromotion { get; private set; }
 
     public string LastBestMove { get; private set; } = "";
@@ -317,15 +306,6 @@ public sealed class StockfishEngine : IDisposable
 
         // =========================================================
         // UCI MOVE
-        //
-        // Normal:
-        // e2e4
-        //
-        // Promotion:
-        // e7e8q
-        // e7e8r
-        // e7e8b
-        // e7e8n
         // =========================================================
 
         if (notation.Length < 4)

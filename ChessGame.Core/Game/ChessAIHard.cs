@@ -258,10 +258,6 @@ private sealed class SearchTimeoutException : Exception
                     }
                     catch (SearchTimeoutException)
                     {
-                        // Minimax timeout.
-                        // The root move is still applied,
-                        // so undo it exactly once here.
-
                         game.UndoSearchMove();
 
                         Console.WriteLine(
@@ -271,12 +267,8 @@ private sealed class SearchTimeoutException : Exception
                         break;
                     }
 
-                    // Normal completed search.
-                    // Undo the root move exactly once.
                     game.UndoSearchMove();
 
-
-                // Small randomness for equal moves.
                 score +=
                     Random.Next(
                         0,
@@ -1296,7 +1288,6 @@ private sealed class SearchTimeoutException : Exception
             );
         }
 
-        // Highest scoring moves first.
         scoredMoves.Sort(
             (a, b) =>
                 b.Score.CompareTo(a.Score)
@@ -1325,7 +1316,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 1. MATERIAL
+        // MATERIAL
         // =========================================================
 
         for (
@@ -1369,7 +1360,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 2. CENTER CONTROL
+        // CENTER CONTROL
         // =========================================================
 
         score +=
@@ -1380,7 +1371,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 3. PIECE ACTIVITY
+        // PIECE ACTIVITY
         // =========================================================
 
         score +=
@@ -1391,7 +1382,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 4. PAWN STRUCTURE
+        // PAWN STRUCTURE
         // =========================================================
 
         score +=
@@ -1402,7 +1393,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 5. PASSED PAWNS
+        // PASSED PAWNS
         // =========================================================
 
         score +=
@@ -1413,7 +1404,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 6. KING SAFETY
+        // KING SAFETY
         // =========================================================
 
         score +=
@@ -1424,7 +1415,7 @@ private sealed class SearchTimeoutException : Exception
 
 
         // =========================================================
-        // 7. CHECK
+        // CHECK
         // =========================================================
 
         if (CheckDetector.IsInCheck(
@@ -1894,9 +1885,6 @@ private sealed class SearchTimeoutException : Exception
                 aiKing.Value.Column >= 2 &&
                 aiKing.Value.Column <= 5)
             {
-                // King in the centre is slightly dangerous
-                // during the opening/middlegame.
-
                 if (game.MoveHistory.Count < 20)
                 {
                     score -= 25;
@@ -1969,9 +1957,6 @@ private sealed class SearchTimeoutException : Exception
                 ? CheckmateScore + depth
                 : -CheckmateScore - depth;
         }
-
-
-        // All draw results.
 
         return 0;
     }

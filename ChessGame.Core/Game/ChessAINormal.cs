@@ -352,16 +352,6 @@ public static class ChessAINormal
         // =========================================================
         // OPPONENT'S BEST CAPTURE
         // =========================================================
-        //
-        // After our move:
-        //
-        //     AI move
-        //          ↓
-        //     Opponent can capture?
-        //
-        // If the opponent can immediately capture
-        // our moved piece, reduce the score.
-        //
 
         int opponentBestCapture =
             GetOpponentBestCaptureValue(

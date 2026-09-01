@@ -99,11 +99,6 @@ public class CheckDetectorTests
         board.Clear();
 
         // -----------------------------------------------------
-        // Known stalemate position:
-        //
-        // Black King: h8
-        // White King: f7
-        // White Queen: g6
         // -----------------------------------------------------
 
         // Black king: h8

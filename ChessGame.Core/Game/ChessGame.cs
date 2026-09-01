@@ -739,8 +739,6 @@ public class ChessGame
                 color
             );
 
-        // A promotion type is only valid when
-        // the move is actually a promotion.
         if (!isPromotion &&
             promotionType != null)
         {
@@ -909,7 +907,6 @@ public class ChessGame
             record.MovedPiece
         );
 
-        // Clear destination square.
         Board.SetPiece(
             move.To,
             null
@@ -1196,11 +1193,6 @@ public class ChessGame
         Board board,
         string castlingRights)
     {
-        // Default:
-        // Pieces loaded from FEN are considered
-        // to have moved unless the FEN explicitly
-        // gives them castling rights.
-
         for (int row = 0; row < Board.Size; row++)
         {
             for (int column = 0; column < Board.Size; column++)

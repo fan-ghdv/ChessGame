@@ -43,9 +43,6 @@ public class GameResultCheckTests
 
         // -----------------------------------------------------
         // White Queen
-        //
-        // Queen at (1, 6) checks the black king.
-        // White king protects the queen and escape squares.
         // -----------------------------------------------------
 
         game.Board.SetPiece(
