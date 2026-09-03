@@ -7,9 +7,11 @@ public static class MoveValidator
     public static bool IsLegalMove(
         Board board,
         Move move,
-        PieceColor color)
+        PieceColor color,
+        Move? lastMove = null)
     {
-        Piece? piece = board.GetPiece(move.From);
+        Piece? piece =
+            board.GetPiece(move.From);
 
         if (piece == null)
         {
@@ -36,18 +38,82 @@ public static class MoveValidator
             return false;
         }
 
-        if (!PieceMovement.IsValidMove(
+        // =========================================================
+        // CHECK NORMAL MOVE / EN PASSANT
+        // =========================================================
+
+        bool isNormalMove =
+            PieceMovement.IsValidMove(
                 board,
                 move.From,
-                move.To))
+                move.To
+            );
+
+        bool isEnPassant =
+            EnPassantValidator.CanCapture(
+                board,
+                move,
+                lastMove,
+                color
+            );
+
+        if (!isNormalMove &&
+            !isEnPassant)
         {
             return false;
         }
 
-        Piece? capturedPiece = targetPiece;
+        // =========================================================
+        // SAVE PIECES
+        // =========================================================
 
-        board.SetPiece(move.To, piece);
-        board.SetPiece(move.From, null);
+        Piece? capturedPiece =
+            targetPiece;
+
+        Position? enPassantCapturedPosition =
+            null;
+
+        // =========================================================
+        // EN PASSANT CAPTURED PAWN
+        // =========================================================
+
+        if (isEnPassant)
+        {
+            enPassantCapturedPosition =
+                new Position(
+                    move.From.Row,
+                    move.To.Column
+                );
+
+            capturedPiece =
+                board.GetPiece(
+                    enPassantCapturedPosition.Value
+                );
+
+            // Remove the captured pawn temporarily.
+            board.SetPiece(
+                enPassantCapturedPosition.Value,
+                null
+            );
+        }
+
+        // =========================================================
+        // SIMULATE MOVE
+        // =========================================================
+
+        board.SetPiece(
+            move.From,
+            null
+        );
+
+        board.SetPiece(
+            move.To,
+            piece
+        );
+
+        // =========================================================
+        // CHECK KING
+        // =========================================================
 
         bool kingInCheck =
             CheckDetector.IsInCheck(
@@ -55,8 +121,32 @@ public static class MoveValidator
                 color
             );
 
-        board.SetPiece(move.From, piece);
-        board.SetPiece(move.To, capturedPiece);
+        // =========================================================
+        // RESTORE MOVE
+        // =========================================================
+
+        board.SetPiece(
+            move.From,
+            piece
+        );
+
+        board.SetPiece(
+            move.To,
+            targetPiece
+        );
+
+        // =========================================================
+        // RESTORE EN PASSANT PAWN
+        // =========================================================
+
+        if (isEnPassant &&
+            enPassantCapturedPosition.HasValue)
+        {
+            board.SetPiece(
+                enPassantCapturedPosition.Value,
+                capturedPiece
+            );
+        }
 
         return !kingInCheck;
     }

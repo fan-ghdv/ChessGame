@@ -350,34 +350,48 @@ public static class ChessAINormal
 
 
         // =========================================================
-        // OPPONENT'S BEST CAPTURE
-        // =========================================================
-
-        int opponentBestCapture =
-            GetOpponentBestCaptureValue(
-                game,
-                opponent
-            );
-
-
-        score -=
-            opponentBestCapture;
-
-
-        // =========================================================
         // PIECE SAFETY
         // =========================================================
 
         if (IsPieceImmediatelyCapturable(
-                game,
-                move.To,
-                opponent
-            ))
+            game,
+            move.To,
+            opponent
+        ))
         {
-            score -=
+            int movingPieceValue =
                 GetPieceValue(
                     movingPiece.Type
-                ) / 2;
+                );
+
+            int capturedPieceValue =
+                capturedPiece != null
+                    ? GetPieceValue(
+                        capturedPiece.Type
+                    )
+                    : 0;
+
+
+            // ---------------------------------------------------------
+            // NORMAL EXCHANGE
+            // ---------------------------------------------------------
+
+            if (capturedPieceValue >=
+                movingPieceValue * 70 / 100)
+            {
+                score -=
+                    movingPieceValue / 10;
+            }
+
+            // ---------------------------------------------------------
+            // BAD TRADE
+            // ---------------------------------------------------------
+
+            else
+            {
+                score -=
+                    movingPieceValue / 2;
+            }
         }
 
 

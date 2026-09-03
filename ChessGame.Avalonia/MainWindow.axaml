@@ -1,14 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-     mc:Ignorable="d"
      x:Class="ChessGame.Avalonia.MainWindow"
      Title="Chess Game"
      Width="1200"
      Height="800"
-     MinWidth="900"
-     MinHeight="650"
+     MinWidth="1080"
+     MinHeight="700"
      Background="#262522">
 
 <!-- =========================================================
@@ -150,6 +147,20 @@
                     IsEnabled="False"
                     Click="AIStartButton_Click"/>
 
+            <Button x:Name="AIBackButton"
+                    Content="Back"
+                    Width="360"
+                    Height="50"
+                    Margin="0,70,0,0"
+                    FontSize="17"
+                    Background="#3A3937"
+                    Foreground="White"
+                    BorderThickness="0"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Padding="0"
+                    Click="AIBackButton_Click"/>
+
         </StackPanel>
 
     </Grid>
@@ -185,51 +196,55 @@
              ================================================= -->
 
         <Grid Grid.Row="1"
-              ColumnDefinitions="*,340"
-              ColumnSpacing="25">
-
+            ColumnDefinitions="190,*,340"
+            ColumnSpacing="15">
 
             <!-- =================================================
-                 BOARD AREA
-                 ================================================= -->
+                CAPTURED PIECES AREA
+                ================================================= -->
 
-            <Grid Grid.Column="0"
-                  HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch">
+            <Grid x:Name="CapturedArea"
+                Grid.Column="0"
+                Width="190"
+                MinWidth="90"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Stretch">
 
+                <Grid RowDefinitions="*,*"
+                    RowSpacing="20">
 
-                <!-- =================================================
-                     CAPTURED PIECES - TOP LEFT
-                     ================================================= -->
+                    <!-- =============================================
+                        TOP CAPTURED
+                        ============================================= -->
 
-                <StackPanel HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
-                            Margin="8,30,0,0"
-                            Spacing="2"
-                            Panel.ZIndex="10">
+                    <StackPanel Grid.Row="0"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Center"
+                                Margin="0,20,0,0"
+                                Spacing="3">
 
-                    <TextBlock x:Name="PlayerCapturedTitle"
-                               Text="CAPTURED"
-                               FontSize="15"
-                               FontWeight="Bold"
-                               Foreground="#AAAAAA"/>
+                        <TextBlock x:Name="PlayerCapturedTitle"
+                                Text="CAPTURED"
+                                FontSize="14"
+                                FontWeight="Bold"
+                                Foreground="#AAAAAA"
+                                HorizontalAlignment="Center"/>
 
-                    <WrapPanel x:Name="PlayerCapturedPieces"
-                            Orientation="Horizontal"
-                            ItemWidth="40"
-                            ItemHeight="40"
-                            Width="200"
-                            Height="120"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"/>
-
-                    <StackPanel Spacing="2">
+                        <WrapPanel x:Name="PlayerCapturedPieces"
+                                Orientation="Horizontal"
+                                ItemWidth="36"
+                                ItemHeight="36"
+                                Width="180"
+                                Height="108"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"/>
 
                         <TextBlock x:Name="PlayerScoreText"
                                 Text="SCORE: 0"
-                                FontSize="14"
+                                FontSize="18"
                                 FontWeight="SemiBold"
                                 Foreground="#F0F0F0"
+                                HorizontalAlignment="Left"
                                 Margin="0,3,0,0"/>
 
                         <Border Height="18"
@@ -237,8 +252,7 @@
 
                             <TextBlock x:Name="PlayerCaptureMessageText"
                                     Text=""
-                                    FontSize="12"
-                                    FontWeight="SemiBold"
+                                    FontSize="15"
                                     Foreground="#F0F0F0"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"/>
@@ -247,18 +261,83 @@
 
                     </StackPanel>
 
-                </StackPanel>
+
+                    <!-- =============================================
+                        BOTTOM CAPTURED
+                        ============================================= -->
+
+                    <StackPanel Grid.Row="1"
+                                VerticalAlignment="Bottom"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,20"
+                                Spacing="3">
+
+                        <TextBlock x:Name="OpponentCapturedTitle"
+                                Text="CAPTURED"
+                                FontSize="14"
+                                FontWeight="Bold"
+                                Foreground="#AAAAAA"
+                                HorizontalAlignment="Center"/>
+
+                        <WrapPanel x:Name="OpponentCapturedPieces"
+                                Orientation="Horizontal"
+                                ItemWidth="36"
+                                ItemHeight="36"
+                                Width="180"
+                                Height="108"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"/>
+
+                        <TextBlock x:Name="OpponentScoreText"
+                                Text="SCORE: 0"
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                Foreground="#F0F0F0"
+                                HorizontalAlignment="Left"
+                                Margin="0,3,0,0"/>
+
+                        <Border Height="18"
+                                Margin="0,2,0,0">
+
+                            <TextBlock x:Name="OpponentCaptureMessageText"
+                                    Text=""
+                                    FontSize="15"
+                                    Foreground="#F0F0F0"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"/>
+
+                        </Border>
+
+                    </StackPanel>
+
+                </Grid>
+
+            </Grid>
+
+
+            <!-- =================================================
+                 BOARD AREA
+                 ================================================= -->
+
+            <Grid x:Name="BoardArea"
+                Grid.Column="1"
+                MinWidth="480"
+                MinHeight="480"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
 
 
                 <!-- =================================================
                      BOARD
                      ================================================= -->
 
-                <Viewbox Width="660"
-                        Height="660"
-                        Stretch="Uniform"
+                <Viewbox Stretch="Uniform"
                         HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Center"
+                        MaxWidth="660"
+                        MaxHeight="660"
+                        MinWidth="480"
+                        MinHeight="480">
 
                     <Border Width="700"
                             Height="700"
@@ -359,8 +438,15 @@
                                     Padding="0">
 
                                 <Grid x:Name="ChessBoard"
-                                      Width="640"
-                                      Height="640"/>
+                                    Width="640"
+                                    Height="640">
+
+                                    <Canvas x:Name="PieceAnimationLayer"
+                                            IsHitTestVisible="False"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"/>
+                                            
+                                </Grid>
 
                             </Border>
 
@@ -418,58 +504,6 @@
 
                 </Viewbox>
 
-
-                <!-- =================================================
-                     CAPTURED PIECES - BOTTOM LEFT
-                     ================================================= -->
-
-                <StackPanel HorizontalAlignment="Left"
-                            VerticalAlignment="Bottom"
-                            Margin="8,0,0,30"
-                            Spacing="2"
-                            Panel.ZIndex="10">
-
-                    <TextBlock x:Name="OpponentCapturedTitle"
-                               Text="CAPTURED"
-                               FontSize="15"
-                               FontWeight="Bold"
-                               Foreground="#AAAAAA"/>
-
-                    <WrapPanel x:Name="OpponentCapturedPieces"
-                            Orientation="Horizontal"
-                            ItemWidth="40"
-                            ItemHeight="40"
-                            Width="200"
-                            Height="120"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"/>
-
-                    <StackPanel Spacing="2">
-
-                        <TextBlock x:Name="OpponentScoreText"
-                                Text="SCORE: 0"
-                                FontSize="14"
-                                FontWeight="SemiBold"
-                                Foreground="#F0F0F0"
-                                Margin="0,3,0,0"/>
-
-                        <Border Height="18"
-                                Margin="0,2,0,0">
-
-                            <TextBlock x:Name="OpponentCaptureMessageText"
-                                    Text=""
-                                    FontSize="12"
-                                    FontWeight="SemiBold"
-                                    Foreground="#F0F0F0"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"/>
-
-                        </Border>
-
-                    </StackPanel>
-
-                </StackPanel>
-
             </Grid>
 
 
@@ -477,7 +511,7 @@
                  RIGHT PANEL
                  ================================================= -->
 
-            <Border Grid.Column="1"
+            <Border Grid.Column="2"
                     Background="#302E2B"
                     CornerRadius="8"
                     Padding="20"
@@ -513,13 +547,14 @@
                             </Border>
 
 
-                            <TextBlock Grid.Column="1"
-                                       Text="CHESS"
-                                       FontSize="17"
-                                       FontWeight="Bold"
-                                       VerticalAlignment="Center"
-                                       Margin="12,0"
-                                       Foreground="#F0F0F0"/>
+                            <TextBlock x:Name="GameModeTitleText"
+                                    Grid.Column="1"
+                                    Text="CHESS"
+                                    FontSize="17"
+                                    FontWeight="Bold"
+                                    VerticalAlignment="Center"
+                                    Margin="12,0"
+                                    Foreground="#F0F0F0"/>
 
 
                             <TextBlock x:Name="TurnText"
@@ -657,7 +692,8 @@
                                       x:Name="SoundEffectsToggle"
                                       IsChecked="True"
                                       OnContent="ON"
-                                      OffContent="OFF"/>
+                                      OffContent="OFF"
+                                      Foreground="#F0F0F0"/>
 
                     </Grid>
 
@@ -681,7 +717,8 @@
                                       x:Name="LegalMovesToggle"
                                       IsChecked="True"
                                       OnContent="ON"
-                                      OffContent="OFF"/>
+                                      OffContent="OFF"
+                                      Foreground="#F0F0F0"/>
 
                     </Grid>
 

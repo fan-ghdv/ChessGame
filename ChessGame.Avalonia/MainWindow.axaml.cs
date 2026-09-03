@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 using ChessGame.Core.Game;
 using ChessGame.Core.Models;
@@ -51,6 +52,14 @@ public partial class MainWindow : Window
 
     private PlayerColorChoice? actualPlayerColor;
 
+    private double CapturedPieceSize = 36;
+
+    private double CapturedPawnSize = 30;
+
+    private Position? lastMoveFrom = null;
+
+    private Position? lastMoveTo = null;
+
     private void ShowMainMenu()
     {
         MainMenuPanel.IsVisible = true;
@@ -59,6 +68,13 @@ public partial class MainWindow : Window
 
         selectedDifficulty = null;
         selectedPlayerColor = null;
+
+        // =========================================================
+        // CLEAR LAST MOVE HIGHLIGHT
+        // =========================================================
+
+        lastMoveFrom = null;
+        lastMoveTo = null;
 
         UpdateAIStartButton();
     }
@@ -169,6 +185,13 @@ public partial class MainWindow : Window
         StartGame();
     }
 
+    private void AIBackButton_Click(
+        object? sender,
+        RoutedEventArgs e)
+    {
+        ShowMainMenu();
+    }
+
     private void StartGame()
     {
         // =========================================================
@@ -238,6 +261,27 @@ public partial class MainWindow : Window
             blackPerspective =
                 actualPlayerColor ==
                 PlayerColorChoice.Black;
+        }
+
+        // =========================================================
+        // UPDATE GAME MODE TITLE
+        // =========================================================
+
+        if (selectedGameMode == GameMode.LocalPlayer)
+        {
+            GameModeTitleText.Text = "2-PLAYER";
+        }
+        else if (selectedGameMode == GameMode.AI)
+        {
+            GameModeTitleText.Text =
+                selectedDifficulty switch
+                {
+                    AIDifficulty.Easy   => "EASY",
+                    AIDifficulty.Normal => "NORMAL",
+                    AIDifficulty.Hard   => "HARD",
+                    AIDifficulty.Bot    => "AI",
+                    _ => "AI"
+                };
         }
 
 
@@ -409,6 +453,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        BoardArea.SizeChanged += BoardArea_SizeChanged;
+
         LegalMovesToggle.IsCheckedChanged +=
             LegalMovesToggle_IsCheckedChanged;
 
@@ -518,6 +564,18 @@ public partial class MainWindow : Window
                         : Color.Parse("#B58863");
 
                 // =========================================================
+                // LAST MOVE HIGHLIGHT
+                // =========================================================
+
+                bool isLastMoveSquare =
+                    lastMoveFrom.HasValue &&
+                    lastMoveTo.HasValue &&
+                    (
+                        lastMoveFrom.Value == position ||
+                        lastMoveTo.Value == position
+                    );
+
+                // =========================================================
                 // GAME OVER KING COLOR
                 // =========================================================
 
@@ -527,13 +585,29 @@ public partial class MainWindow : Window
                         position
                     );
 
+                // =========================================================
+                // LAST MOVE COLOR
+                // =========================================================
+
+                Color lastMoveColor =
+                    (row + col) % 2 == 0
+                        ? Color.Parse("#C7E57A")
+                        : Color.Parse("#9ACD32");
+
+                Color squareColor =
+                    isLastMoveSquare
+                        ? lastMoveColor
+                        : (
+                            gameOverKingColor ??
+                            baseColor
+                        );
+
                 var square =
                     new Border
                     {
                         Background =
                             new SolidColorBrush(
-                                gameOverKingColor ??
-                                baseColor
+                                squareColor
                             ),
 
                         BorderBrush =
@@ -552,16 +626,14 @@ public partial class MainWindow : Window
                 // SELECTED SQUARE
                 // =================================================
 
-                if (!viewingHistory &&
-                    selectedPosition.HasValue &&
-                    selectedPosition.Value == position)
+                if (selectedPosition.HasValue && selectedPosition.Value == position)
                 {
-                    square.Background =
-                        new SolidColorBrush(
-                            Color.Parse(
-                                "#F7EC59"
-                            )
-                        );
+                    Color selectedColor =
+                        (row + col) % 2 == 0
+                            ? Color.Parse("#FFFE8C")
+                            : Color.Parse("#F5DF4D");
+
+                    square.Background = new SolidColorBrush(selectedColor);
                 }
 
                 // =================================================
@@ -656,6 +728,14 @@ public partial class MainWindow : Window
                 );
             }
         }
+
+        // =========================================================
+        // ADD PIECE ANIMATION LAYER ON TOP
+        // =========================================================
+
+        ChessBoard.Children.Add(
+            PieceAnimationLayer
+        );
 
         // =========================================================
         // UPDATE COORDINATES
@@ -801,7 +881,8 @@ public partial class MainWindow : Window
                 if (MoveValidator.IsLegalMove(
                         _game.Board,
                         move,
-                        piece.Color))
+                        piece.Color,
+                        _game.LastMove))
                 {
                     legalMovePositions.Add(to);
                 }
@@ -1109,7 +1190,7 @@ public partial class MainWindow : Window
     // HANDLE SQUARE CLICK
     // =========================================================
 
-    private void HandleSquareClick(
+    private async void HandleSquareClick(
         Position position)
     {
         // =====================================================
@@ -1256,14 +1337,19 @@ public partial class MainWindow : Window
                 from
             );
 
+        bool isCastling =
+            movingPiece != null &&
+            movingPiece.Type == PieceType.King &&
+            Math.Abs(position.Column - from.Column) == 2;
+
         // =====================================================
         // CHECK PROMOTION
         // =====================================================
 
         bool isPromotion =
             movingPiece != null &&
-            movingPiece.Type ==
-                PieceType.Pawn &&
+            movingPiece.Type == PieceType.Pawn &&
+            legalMovePositions.Contains(position) &&
             PawnPromotion.CanPromote(
                 position,
                 movingColor
@@ -1313,6 +1399,19 @@ public partial class MainWindow : Window
             $"{PositionToChessNotation(from)}" +
             $" -> " +
             $"{PositionToChessNotation(position)}"
+        );
+
+        // =====================================================
+        // PLAY PIECE ANIMATION
+        // =====================================================
+
+        lastMoveFrom = from;
+        lastMoveTo = position;
+
+        await AnimateMoveOnBoard(
+            from,
+            position,
+            isCastling
         );
 
         selectedPosition = null;
@@ -1391,22 +1490,22 @@ public partial class MainWindow : Window
                     "Pawn Promotion",
 
                 Width =
-                    320,
+                    420,
 
                 Height =
-                    300,
+                    430,
 
                 MinWidth =
-                    320,
+                    420,
 
                 MinHeight =
-                    300,
+                    430,
 
                 MaxWidth =
-                    320,
+                    420,
 
                 MaxHeight =
-                    300,
+                    430,
 
                 WindowStartupLocation =
                     WindowStartupLocation.CenterOwner,
@@ -1433,7 +1532,7 @@ public partial class MainWindow : Window
                     "Choose Promotion",
 
                 FontSize =
-                    22,
+                    24,
 
                 FontWeight =
                     FontWeight.Bold,
@@ -1451,28 +1550,39 @@ public partial class MainWindow : Window
                 Margin =
                     new Thickness(
                         0,
-                        15,
+                        20,
                         0,
                         15
                     )
             };
 
         // =====================================================
-        // BUTTON PANEL
+        // BUTTON GRID
         // =====================================================
 
-        var buttonPanel =
-            new StackPanel
+        var buttonGrid =
+            new Grid
             {
-                Spacing =
-                    10,
+                Width = 360,
+                Height = 320,
 
-                Margin =
-                    new Thickness(
-                        25,
-                        0,
-                        25,
-                        20
+                HorizontalAlignment =
+                    HorizontalAlignment.Center,
+
+                VerticalAlignment =
+                    VerticalAlignment.Center,
+
+                RowSpacing = 12,
+                ColumnSpacing = 12,
+
+                RowDefinitions =
+                    new RowDefinitions(
+                        "*,*"
+                    ),
+
+                ColumnDefinitions =
+                    new ColumnDefinitions(
+                        "*,*"
                     )
             };
 
@@ -1482,7 +1592,8 @@ public partial class MainWindow : Window
 
         var queenButton =
             CreatePromotionButton(
-                "♕   Queen"
+                PieceType.Queen,
+                color
             );
 
         queenButton.Click +=
@@ -1493,13 +1604,24 @@ public partial class MainWindow : Window
                 );
             };
 
+        Grid.SetRow(
+            queenButton,
+            0
+        );
+
+        Grid.SetColumn(
+            queenButton,
+            0
+        );
+
         // =====================================================
         // ROOK
         // =====================================================
 
         var rookButton =
             CreatePromotionButton(
-                "♖   Rook"
+                PieceType.Rook,
+                color
             );
 
         rookButton.Click +=
@@ -1510,13 +1632,24 @@ public partial class MainWindow : Window
                 );
             };
 
+        Grid.SetRow(
+            rookButton,
+            0
+        );
+
+        Grid.SetColumn(
+            rookButton,
+            1
+        );
+
         // =====================================================
         // BISHOP
         // =====================================================
 
         var bishopButton =
             CreatePromotionButton(
-                "♗   Bishop"
+                PieceType.Bishop,
+                color
             );
 
         bishopButton.Click +=
@@ -1527,13 +1660,24 @@ public partial class MainWindow : Window
                 );
             };
 
+        Grid.SetRow(
+            bishopButton,
+            1
+        );
+
+        Grid.SetColumn(
+            bishopButton,
+            0
+        );
+
         // =====================================================
         // KNIGHT
         // =====================================================
 
         var knightButton =
             CreatePromotionButton(
-                "♘   Knight"
+                PieceType.Knight,
+                color
             );
 
         knightButton.Click +=
@@ -1544,23 +1688,33 @@ public partial class MainWindow : Window
                 );
             };
 
+        Grid.SetRow(
+            knightButton,
+            1
+        );
+
+        Grid.SetColumn(
+            knightButton,
+            1
+        );
+
         // =====================================================
         // ADD BUTTONS
         // =====================================================
 
-        buttonPanel.Children.Add(
+        buttonGrid.Children.Add(
             queenButton
         );
 
-        buttonPanel.Children.Add(
+        buttonGrid.Children.Add(
             rookButton
         );
 
-        buttonPanel.Children.Add(
+        buttonGrid.Children.Add(
             bishopButton
         );
 
-        buttonPanel.Children.Add(
+        buttonGrid.Children.Add(
             knightButton
         );
 
@@ -1571,8 +1725,11 @@ public partial class MainWindow : Window
         var mainPanel =
             new StackPanel
             {
-                Spacing =
-                    5
+                HorizontalAlignment =
+                    HorizontalAlignment.Stretch,
+
+                VerticalAlignment =
+                    VerticalAlignment.Stretch
             };
 
         mainPanel.Children.Add(
@@ -1580,7 +1737,7 @@ public partial class MainWindow : Window
         );
 
         mainPanel.Children.Add(
-            buttonPanel
+            buttonGrid
         );
 
         dialog.Content =
@@ -1626,16 +1783,22 @@ public partial class MainWindow : Window
                 $"{result.Value}"
             );
 
-            selectedPosition = null;
+            lastMoveFrom =
+                move.From;
+
+            lastMoveTo =
+                move.To;
+
+            selectedPosition =
+                null;
 
             legalMovePositions.Clear();
 
             castlingMovePositions.Clear();
 
-
-            // =========================================================
+            // =====================================================
             // KEEP PLAYER PERSPECTIVE
-            // =========================================================
+            // =====================================================
 
             if (selectedGameMode == GameMode.AI)
             {
@@ -1648,10 +1811,9 @@ public partial class MainWindow : Window
                 RestoreCurrentGamePerspective();
             }
 
-
-            // =========================================================
+            // =====================================================
             // REDRAW
-            // =========================================================
+            // =====================================================
 
             CreateBoard();
 
@@ -1661,10 +1823,9 @@ public partial class MainWindow : Window
 
             UpdateGameState();
 
-
-            // =========================================================
+            // =====================================================
             // AI TURN AFTER PROMOTION
-            // =========================================================
+            // =====================================================
 
             if (selectedGameMode == GameMode.AI &&
                 actualPlayerColor.HasValue &&
@@ -1709,6 +1870,7 @@ public partial class MainWindow : Window
         );
 
         CreateBoard();
+
         UpdateCapturedPieces();
     }
 
@@ -1717,27 +1879,181 @@ public partial class MainWindow : Window
     // =========================================================
 
     private static Button CreatePromotionButton(
-        string text)
+        PieceType pieceType,
+        PieceColor color)
     {
+        // =====================================================
+        // SVG FILE NAME
+        // =====================================================
+
+        string colorPrefix =
+            color == PieceColor.White
+                ? "w"
+                : "b";
+
+        string typeName =
+            pieceType switch
+            {
+                PieceType.Queen =>
+                    "queen",
+
+                PieceType.Rook =>
+                    "rook",
+
+                PieceType.Bishop =>
+                    "bishop",
+
+                PieceType.Knight =>
+                    "knight",
+
+                _ =>
+                    ""
+            };
+
+        string imagePath =
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "Assets",
+                "Pieces",
+                $"{colorPrefix}_{typeName}_svg_NoShadow.svg"
+            );
+
+        // =====================================================
+        // SVG
+        // =====================================================
+
+        var svg =
+            new global::Avalonia.Svg.Skia.Svg(
+                new Uri(
+                    AppContext.BaseDirectory,
+                    UriKind.Absolute
+                )
+            )
+            {
+                IsHitTestVisible = false
+            };
+
+        svg.Path =
+            imagePath;
+
+        svg.Width =
+            85;
+
+        svg.Height =
+            85;
+
+        svg.Stretch =
+            Stretch.Uniform;
+
+        svg.HorizontalAlignment =
+            HorizontalAlignment.Center;
+
+        svg.VerticalAlignment =
+            VerticalAlignment.Center;
+
+        svg.EnableCache =
+            true;
+
+        svg.Wireframe =
+            false;
+
+        svg.DisableFilters =
+            false;
+
+        // =====================================================
+        // PIECE NAME
+        // =====================================================
+
+        string pieceName =
+            pieceType switch
+            {
+                PieceType.Queen =>
+                    "Queen",
+
+                PieceType.Rook =>
+                    "Rook",
+
+                PieceType.Bishop =>
+                    "Bishop",
+
+                PieceType.Knight =>
+                    "Knight",
+
+                _ =>
+                    ""
+            };
+
+        var nameText =
+            new TextBlock
+            {
+                Text =
+                    pieceName,
+
+                IsHitTestVisible =
+                    false,
+
+                FontSize =
+                    16,
+
+                FontWeight =
+                    FontWeight.SemiBold,
+
+                Foreground =
+                    new SolidColorBrush(
+                        Color.Parse(
+                            "#F0F0F0"
+                        )
+                    ),
+
+                HorizontalAlignment =
+                    HorizontalAlignment.Center,
+
+                VerticalAlignment =
+                    VerticalAlignment.Center
+            };
+
+        // =====================================================
+        // CONTENT
+        // =====================================================
+
+        var content =
+            new StackPanel
+            {
+                IsHitTestVisible =
+                    false,
+
+                HorizontalAlignment =
+                    HorizontalAlignment.Center,
+
+                VerticalAlignment =
+                    VerticalAlignment.Center,
+
+                Spacing =
+                    3
+            };
+
+        content.Children.Add(
+            svg
+        );
+
+        content.Children.Add(
+            nameText
+        );
+
+        // =====================================================
+        // BUTTON
+        // =====================================================
+
         return new Button
         {
-            Content =
-                text,
+            Width =
+                174,
 
             Height =
-                42,
+                154,
 
-            FontSize =
-                17,
-
-            HorizontalContentAlignment =
-                HorizontalAlignment.Left,
-
-            Padding =
-                new Thickness(
-                    15,
-                    0
-                ),
+            Content =
+                content,
 
             Background =
                 new SolidColorBrush(
@@ -1754,7 +2070,21 @@ public partial class MainWindow : Window
                 ),
 
             BorderThickness =
-                new Thickness(0)
+                new Thickness(0),
+
+            HorizontalContentAlignment =
+                HorizontalAlignment.Center,
+
+            VerticalContentAlignment =
+                VerticalAlignment.Center,
+
+            Padding =
+                new Thickness(0),
+
+            Cursor =
+                new Cursor(
+                    StandardCursorType.Hand
+                )
         };
     }
 
@@ -2373,6 +2703,7 @@ public partial class MainWindow : Window
     private void UpdateCapturedPieces(
         IReadOnlyList<MoveRecord>? history = null)
     {
+
         // =====================================================
         // CLEAR OLD PIECES
         // =====================================================
@@ -2484,10 +2815,9 @@ public partial class MainWindow : Window
                 // =================================================
 
                 double pieceSize =
-                    capturedPiece.Type ==
-                        PieceType.Pawn
-                            ? 30
-                            : 36;
+                    capturedPiece.Type == PieceType.Pawn
+                        ? CapturedPawnSize
+                        : CapturedPieceSize;
 
                 svg.Width =
                     pieceSize;
@@ -2714,7 +3044,7 @@ public partial class MainWindow : Window
         IReadOnlyList<MoveRecord> history =
             _game.MoveHistory.GetAll();
 
-        if (moveCount < 1 ||
+        if (moveCount < 0 ||
             moveCount > history.Count)
         {
             Console.WriteLine(
@@ -2754,6 +3084,48 @@ public partial class MainWindow : Window
 
         legalMovePositions.Clear();
         castlingMovePositions.Clear();
+
+        if (historyGame.MoveHistory.Count > 0)
+        {
+            MoveRecord historyLastMove =
+                historyGame.MoveHistory.GetAll()
+                    [historyGame.MoveHistory.Count - 1];
+
+            lastMoveFrom =
+                historyLastMove.Move.From;
+
+            lastMoveTo =
+                historyLastMove.Move.To;
+        }
+        else
+        {
+            lastMoveFrom = null;
+            lastMoveTo = null;
+        }
+
+        // =========================================================
+        // HISTORY LAST MOVE HIGHLIGHT
+        // =========================================================
+
+        IReadOnlyList<MoveRecord> historyMoves =
+            historyGame.MoveHistory.GetAll();
+
+        if (historyMoves.Count > 0)
+        {
+            MoveRecord lastHistoryMove =
+                historyMoves[historyMoves.Count - 1];
+
+            lastMoveFrom =
+                lastHistoryMove.Move.From;
+
+            lastMoveTo =
+                lastHistoryMove.Move.To;
+        }
+        else
+        {
+            lastMoveFrom = null;
+            lastMoveTo = null;
+        }
 
         // =========================================================
         // DISPLAY HISTORY BOARD
@@ -2803,6 +3175,32 @@ public partial class MainWindow : Window
         Console.WriteLine(
             $"Captured records shown: {visibleHistory.Count}"
         );
+    }
+
+    // =========================================================
+    // UPDATE LAST MOVE HIGHLIGHT
+    // =========================================================
+
+    private void UpdateLastMoveHighlight()
+    {
+        IReadOnlyList<MoveRecord> history =
+            _game.MoveHistory.GetAll();
+
+        if (history.Count == 0)
+        {
+            lastMoveFrom = null;
+            lastMoveTo = null;
+            return;
+        }
+
+        MoveRecord lastMove =
+            history[history.Count - 1];
+
+        lastMoveFrom =
+            lastMove.Move.From;
+
+        lastMoveTo =
+            lastMove.Move.To;
     }
 
     // =========================================================
@@ -2941,6 +3339,8 @@ public partial class MainWindow : Window
                 blackPerspective =
                     actualPlayerColor.Value ==
                     PlayerColorChoice.Black;
+                
+                UpdateLastMoveHighlight();
 
                 CreateBoard();
 
@@ -3038,6 +3438,12 @@ public partial class MainWindow : Window
 
             gameOver = false;
 
+            // =========================================================
+            // UPDATE LAST MOVE HIGHLIGHT
+            // =========================================================
+
+            UpdateLastMoveHighlight();
+
             // =====================================================
             // REDRAW
             // =====================================================
@@ -3115,6 +3521,8 @@ public partial class MainWindow : Window
 
             RestoreCurrentGamePerspective();
 
+            UpdateLastMoveHighlight();
+
             CreateBoard();
 
             UpdateMoveHistory();
@@ -3139,6 +3547,12 @@ public partial class MainWindow : Window
         // =========================================================
 
         gameOver = false;
+
+        // =========================================================
+        // UPDATE LAST MOVE HIGHLIGHT
+        // =========================================================
+
+        UpdateLastMoveHighlight();
 
         // =========================================================
         // REDRAW
@@ -3183,6 +3597,9 @@ public partial class MainWindow : Window
         viewingMoveCount = 0;
 
         selectedPosition = null;
+
+        lastMoveFrom = null;
+        lastMoveTo = null;
 
         legalMovePositions.Clear();
 
@@ -3494,6 +3911,8 @@ public partial class MainWindow : Window
         // =========================================================
 
         gameOver = false;
+
+        UpdateLastMoveHighlight();
 
         CreateBoard(_game);
 
@@ -4682,6 +5101,14 @@ public partial class MainWindow : Window
                     aiMove.From
                 );
 
+            bool isCastling =
+                movingPiece != null &&
+                movingPiece.Type == PieceType.King &&
+                Math.Abs(
+                    aiMove.To.Column -
+                    aiMove.From.Column
+                ) == 2;
+
             bool isPromotion =
                 movingPiece != null &&
                 movingPiece.Type == PieceType.Pawn &&
@@ -4747,6 +5174,19 @@ public partial class MainWindow : Window
 
                 return;
             }
+
+            lastMoveFrom = aiMove.From;
+            lastMoveTo = aiMove.To;
+
+            // =====================================================
+            // PLAY AI PIECE ANIMATION
+            // =====================================================
+
+            await AnimateMoveOnBoard(
+                aiMove.From,
+                aiMove.To,
+                isCastling
+            );
 
             if (movingPiece != null &&
                 SoundEffectsToggle.IsChecked == true)
@@ -4897,6 +5337,455 @@ public partial class MainWindow : Window
             PieceType.Queen  => "Queen",
             _ => "Piece"
         };
+    }
+
+    private void BoardArea_SizeChanged(
+        object? sender,
+        SizeChangedEventArgs e)
+    {
+        UpdateCapturedPieces();
+    }
+
+    private async Task AnimatePieceMove(
+        Control piece,
+        double fromX,
+        double fromY,
+        double toX,
+        double toY)
+    {
+        const double baseDuration = 180;
+
+        double distance =
+            Math.Sqrt(
+                Math.Pow(toX - fromX, 2) +
+                Math.Pow(toY - fromY, 2));
+
+        double duration =
+            Math.Clamp(
+                baseDuration + distance * 0.35,
+                200,
+                420);
+
+        var stopwatch = Stopwatch.StartNew();
+
+        while (true)
+        {
+            double elapsed =
+                stopwatch.Elapsed.TotalMilliseconds;
+
+            double t =
+                Math.Clamp(
+                    elapsed / duration,
+                    0.0,
+                    1.0);
+
+            double eased;
+
+            if (t < 0.5)
+            {
+                eased = 4 * t * t * t;
+            }
+            else
+            {
+                eased =
+                    1 -
+                    Math.Pow(
+                        -2 * t + 2,
+                        3
+                    ) / 2;
+            }
+
+            double currentX =
+                fromX +
+                (toX - fromX) * eased;
+
+            double currentY =
+                fromY +
+                (toY - fromY) * eased;
+
+            Canvas.SetLeft(piece, currentX);
+            Canvas.SetTop(piece, currentY);
+
+            if (t >= 1.0)
+            {
+                break;
+            }
+
+            await Task.Delay(8);
+        }
+
+        Canvas.SetLeft(
+            piece,
+            toX);
+
+        Canvas.SetTop(
+            piece,
+            toY);
+    }
+
+    private double GetBoardSquareSize()
+    {
+        double boardWidth = ChessBoard.Bounds.Width;
+        double boardHeight = ChessBoard.Bounds.Height;
+
+        if (boardWidth <= 0 || boardHeight <= 0)
+            return 0;
+
+        return Math.Min(
+            boardWidth,
+            boardHeight
+        ) / 8.0;
+    }
+    private async Task AnimateMoveOnBoard(
+        Position from,
+        Position to,
+        bool isCastling = false)
+    {
+        double squareSize =
+            GetBoardSquareSize();
+
+        if (squareSize <= 0)
+            return;
+
+        // =========================================================
+        // DISPLAY POSITION - KING
+        // =========================================================
+
+        int fromDisplayRow =
+            blackPerspective
+                ? 7 - from.Row
+                : from.Row;
+
+        int fromDisplayColumn =
+            blackPerspective
+                ? 7 - from.Column
+                : from.Column;
+
+        int toDisplayRow =
+            blackPerspective
+                ? 7 - to.Row
+                : to.Row;
+
+        int toDisplayColumn =
+            blackPerspective
+                ? 7 - to.Column
+                : to.Column;
+
+
+        // =========================================================
+        // NORMAL MOVE
+        // =========================================================
+
+        if (!isCastling)
+        {
+            await AnimateSinglePieceOnBoard(
+                from,
+                to,
+                fromDisplayRow,
+                fromDisplayColumn,
+                toDisplayRow,
+                toDisplayColumn,
+                squareSize
+            );
+
+            return;
+        }
+
+
+        // =========================================================
+        // CASTLING
+        // KING + ROOK
+        // START AT THE SAME TIME
+        // =========================================================
+
+        int row = from.Row;
+
+        Position rookFrom;
+        Position rookTo;
+
+
+        // =========================================================
+        // KING-SIDE CASTLING
+        // =========================================================
+
+        if (to.Column > from.Column)
+        {
+            // King: e1 -> g1
+            // Rook: h1 -> f1
+
+            rookFrom =
+                new Position(
+                    row,
+                    7
+                );
+
+            rookTo =
+                new Position(
+                    row,
+                    5
+                );
+        }
+
+        // =========================================================
+        // QUEEN-SIDE CASTLING
+        // =========================================================
+
+        else
+        {
+            // King: e1 -> c1
+            // Rook: a1 -> d1
+
+            rookFrom =
+                new Position(
+                    row,
+                    0
+                );
+
+            rookTo =
+                new Position(
+                    row,
+                    3
+                );
+        }
+
+
+        // =========================================================
+        // DISPLAY POSITION - ROOK
+        // =========================================================
+
+        int rookFromDisplayRow =
+            blackPerspective
+                ? 7 - rookFrom.Row
+                : rookFrom.Row;
+
+        int rookFromDisplayColumn =
+            blackPerspective
+                ? 7 - rookFrom.Column
+                : rookFrom.Column;
+
+        int rookToDisplayRow =
+            blackPerspective
+                ? 7 - rookTo.Row
+                : rookTo.Row;
+
+        int rookToDisplayColumn =
+            blackPerspective
+                ? 7 - rookTo.Column
+                : rookTo.Column;
+
+
+        // =========================================================
+        // START KING + ROOK SIMULTANEOUSLY
+        // =========================================================
+
+        Task kingAnimation =
+            AnimateSinglePieceOnBoard(
+                from,
+                to,
+                fromDisplayRow,
+                fromDisplayColumn,
+                toDisplayRow,
+                toDisplayColumn,
+                squareSize
+            );
+
+        Task rookAnimation =
+            AnimateSinglePieceOnBoard(
+                rookFrom,
+                rookTo,
+                rookFromDisplayRow,
+                rookFromDisplayColumn,
+                rookToDisplayRow,
+                rookToDisplayColumn,
+                squareSize
+            );
+
+
+        // =========================================================
+        // WAIT FOR BOTH TO FINISH
+        // =========================================================
+
+        await Task.WhenAll(
+            kingAnimation,
+            rookAnimation
+        );
+    }
+
+    // =============================================================
+    // ANIMATE ONE PIECE
+    // =============================================================
+
+    private async Task AnimateSinglePieceOnBoard(
+        Position from,
+        Position to,
+        int fromDisplayRow,
+        int fromDisplayColumn,
+        int toDisplayRow,
+        int toDisplayColumn,
+        double squareSize)
+    {
+        // =========================================================
+        // FIND SOURCE / TARGET
+        // =========================================================
+
+        Border? fromSquare = null;
+        Border? toSquare = null;
+
+        foreach (var child in ChessBoard.Children)
+        {
+            if (child is not Border square)
+                continue;
+
+            int row =
+                Grid.GetRow(square);
+
+            int column =
+                Grid.GetColumn(square);
+
+            if (row == fromDisplayRow &&
+                column == fromDisplayColumn)
+            {
+                fromSquare = square;
+            }
+
+            if (row == toDisplayRow &&
+                column == toDisplayColumn)
+            {
+                toSquare = square;
+            }
+        }
+
+        // =========================================================
+        // SOURCE NOT FOUND
+        // =========================================================
+
+        if (fromSquare == null)
+            return;
+
+        // =========================================================
+        // GET PIECE
+        // =========================================================
+
+        if (fromSquare.Child is not Control piece)
+            return;
+
+        // =========================================================
+        // REMOVE PIECE FROM BOARD SQUARE
+        // =========================================================
+
+        fromSquare.Child = null;
+
+        // =========================================================
+        // HIDE CAPTURED PIECE
+        // =========================================================
+
+        Control? capturedPiece = null;
+
+        if (toSquare?.Child is Control targetPiece)
+        {
+            capturedPiece =
+                targetPiece;
+
+            targetPiece.IsVisible =
+                false;
+        }
+
+        // =========================================================
+        // ADD PIECE TO ANIMATION LAYER
+        // =========================================================
+
+        PieceAnimationLayer.Children.Add(
+            piece
+        );
+
+        // =========================================================
+        // PIECE SIZE
+        // =========================================================
+
+        double pieceSize =
+            piece.Width > 0
+                ? piece.Width
+                : 65;
+
+        piece.Width =
+            pieceSize;
+
+        piece.Height =
+            pieceSize;
+
+        piece.IsVisible =
+            true;
+
+        double pieceOffset =
+            (squareSize - pieceSize) / 2.0;
+
+        // =========================================================
+        // START POSITION
+        // =========================================================
+
+        double fromX =
+            fromDisplayColumn * squareSize +
+            pieceOffset;
+
+        double fromY =
+            fromDisplayRow * squareSize +
+            pieceOffset;
+
+        // =========================================================
+        // END POSITION
+        // =========================================================
+
+        double toX =
+            toDisplayColumn * squareSize +
+            pieceOffset;
+
+        double toY =
+            toDisplayRow * squareSize +
+            pieceOffset;
+
+        // =========================================================
+        // SET INITIAL POSITION
+        // =========================================================
+
+        Canvas.SetLeft(
+            piece,
+            fromX
+        );
+
+        Canvas.SetTop(
+            piece,
+            fromY
+        );
+
+        // =========================================================
+        // PLAY ANIMATION
+        // =========================================================
+
+        await AnimatePieceMove(
+            piece,
+            fromX,
+            fromY,
+            toX,
+            toY
+        );
+
+        // =========================================================
+        // REMOVE FROM ANIMATION LAYER
+        // =========================================================
+
+        PieceAnimationLayer.Children.Remove(
+            piece
+        );
+
+        // =========================================================
+        // RESTORE CAPTURED PIECE
+        // =========================================================
+
+        if (capturedPiece != null)
+        {
+            capturedPiece.IsVisible =
+                true;
+        }
     }
 }
 

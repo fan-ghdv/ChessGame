@@ -80,8 +80,7 @@ public static class EnPassantValidator
             return false;
         }
 
-        // The last move must belong to the pawn
-        // next to our pawn.
+        // The last move must belong to the pawn next to our pawn.
         if (lastMove.To !=
             new Position(
                 move.From.Row,
