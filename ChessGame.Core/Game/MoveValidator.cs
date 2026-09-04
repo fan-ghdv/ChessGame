@@ -90,7 +90,6 @@ public static class MoveValidator
                     enPassantCapturedPosition.Value
                 );
 
-            // Remove the captured pawn temporarily.
             board.SetPiece(
                 enPassantCapturedPosition.Value,
                 null

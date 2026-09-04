@@ -77,13 +77,11 @@ public static class BishopMoves
             }
             else
             {
-                // Enemy piece can be captured
                 if (targetPiece.Color != color)
                 {
                     moves.Add(targetPosition);
                 }
 
-                // Bishop cannot move through a piece
                 break;
             }
 

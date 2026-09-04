@@ -9,9 +9,6 @@ new Random();
 
 // =========================================================
 // PIECE VALUES
-//
-// Easy AI only uses these values for very simple decisions.
-// It does NOT search multiple moves ahead.
 // =========================================================
 
 private static int GetPieceValue(
@@ -184,21 +181,7 @@ public static Move? GetRandomMove(
 
     // =========================================================
     // EASY AI
-    //
-    // Do NOT always choose the best move.
-    //
-    // Most of the time:
-    //     prefer moves that capture pieces.
-    //
-    // Sometimes:
-    //     choose completely randomly.
-    //
-    // This keeps Easy noticeably weaker than Normal.
     // =========================================================
-
-    // ---------------------------------------------------------
-    // 25% chance of completely random move.
-    // ---------------------------------------------------------
 
     if (Random.NextDouble() < 0.25)
     {
